@@ -75,11 +75,10 @@ def suggest_jobs(user_input):
         }
     ]
 
-    return jobs
-    # Sort by match %
-    results.sort(key=lambda x: x["match"], reverse=True)
+    # ✅ SORT CORRECTLY
+    jobs.sort(key=lambda x: x["match"], reverse=True)
 
-    return results
+    return jobs
 
 
 # =========================
@@ -213,4 +212,4 @@ def logout():
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=por

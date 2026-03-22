@@ -11,12 +11,12 @@
         }
 
         .container {
-            width: 420px;
-            margin: 50px auto;
+            width: 450px;
+            margin: 40px auto;
             background: white;
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
 
         h1 {
@@ -25,45 +25,66 @@
 
         input {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             margin: 10px 0;
-            border-radius: 8px;
+            border-radius: 10px;
             border: 1px solid #ccc;
         }
 
         button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background: #667eea;
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #5a67d8;
         }
 
         .card {
-            background: #f9f9f9;
+            background: #f8f8f8;
             padding: 15px;
             margin-top: 15px;
-            border-radius: 10px;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: scale(1.02);
         }
 
         .progress {
             height: 8px;
             background: #ddd;
             border-radius: 5px;
-            margin-top: 5px;
         }
 
-        .progress-bar {
+        .bar {
             height: 8px;
             background: green;
             border-radius: 5px;
         }
+
+        .missing {
+            color: red;
+            font-weight: bold;
+        }
+
+        .download-btn {
+            margin-top: 15px;
+            background: #28a745;
+        }
+
     </style>
 </head>
 
 <body>
+
 <div class="container">
 
     <h1>🚀 AI Career Guidance</h1>
@@ -83,16 +104,22 @@
             <p>Match: {{ r.score }}%</p>
 
             <div class="progress">
-                <div class="progress-bar" style="width: {{ r.score }}%"></div>
+                <div class="bar" style="width: {{ r.score }}%"></div>
             </div>
 
             <p><b>Required:</b> {{ r.required }}</p>
-            <p><b>Missing:</b> {{ r.missing }}</p>
+            <p class="missing">Missing: {{ r.missing }}</p>
             <p><b>Roadmap:</b> {{ r.roadmap }}</p>
         </div>
         {% endfor %}
+
+        <a href="/download">
+            <button class="download-btn">⬇ Download Report</button>
+        </a>
+
     {% endif %}
 
 </div>
+
 </body>
 </html>

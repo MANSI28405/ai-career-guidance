@@ -31,7 +31,7 @@ init_db()
 # =========================
 # LOAD DATASET
 # =========================
-df = pd.read_csv("naukri_com_job_sample.csv")
+df = pd.read_csv("naukri_com-job_sample.csv")
 print(df.columns)
 df = df.dropna(subset=["jobdescr"])
 df = df.head(2000)

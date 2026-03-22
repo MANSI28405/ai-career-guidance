@@ -4,6 +4,23 @@ import io
 
 app = Flask(__name__)
 app.secret_key = "secret123"
+def init_db():
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        username TEXT,
+        password TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# 👇 CALL IT HERE
+init_db()
 
 # =========================
 # DUMMY JOB DATA (SIMPLE)

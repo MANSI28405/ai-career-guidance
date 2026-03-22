@@ -8,31 +8,9 @@
 
 <h2>AI Career Guidance</h2>
 
-<!-- ✅ INPUT FORM (THIS WAS MISSING) -->
+<!-- FORCE VISIBLE FORM -->
+<div style="background:white; padding:15px; color:black; width:300px;">
 <form method="POST">
-    <input name="skills" placeholder="Enter skills" style="padding:10px; width:200px;">
-    <input name="interests" placeholder="Enter interests" style="padding:10px; width:200px;">
-    <button type="submit">Get Suggestions</button>
-</form>
-
-<br><br>
-
-<h2>Career Suggestions</h2>
-
-{% for job in results %}
-<div style="background:white; color:black; padding:10px; margin-bottom:10px;">
-    <h3>{{ job.role }}</h3>
-    <p>Match: {{ job.match }}%</p>
-    <p><b>Required:</b> {{ job.required }}</p>
-    <p><b>Missing:</b> {{ job.missing }}</p>
-    <p><b>Roadmap:</b> {{ job.roadmap }}</p>
-</div>
-{% endfor %}
-
-<br>
-
-<a href="/download"><button>Download Report</button></a>
-<a href="/logout"><button>Logout</button></a>
-
-</body>
-</html>
+    <input name="skills" placeholder="Enter skills"><br><br>
+    <input name="interests" placeholder="Enter interests"><br><br>
+    <button

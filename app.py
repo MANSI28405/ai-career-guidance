@@ -104,65 +104,37 @@ def save_results(results):
 # ==============================
 
 def suggest_jobs(user_input):
+    user_input = user_input.lower()
+    user_skills = clean_input(user_input)
 
-    # 🔥 fallback safety (prevents crash)
-    if not job_desc_list or tfidf_matrix is None:
-        return [{
-            "role": "Software Engineer",
-            "score": 80,
-            "required": "python, sql",
-            "missing": "machine learning",
-            "roadmap": "Learn ML → Build projects → Apply"
-        }]
+    roles = {
+        "Data Scientist": ["python", "machine learning", "data science", "pandas", "numpy"],
+        "Machine Learning Engineer": ["python", "ml", "deep learning", "tensorflow"],
+        "Backend Developer": ["python", "django", "flask", "sql"],
+        "Frontend Developer": ["html", "css", "javascript", "react"],
+        "Software Engineer": ["java", "c++", "problem solving", "coding"],
+    }
 
     results = []
 
-    try:
-        user_vec = vectorizer.transform([user_input])
-        similarity = cosine_similarity(user_vec, tfidf_matrix)
+    for role, skills in roles.items():
+        match = len([s for s in user_skills if s in skills])
+        score = int((match / len(skills)) * 100)
 
-        indices = similarity[0].argsort()[-10:][::-1]
+        missing = [s for s in skills if s not in user_skills]
 
-        seen = set()
-
-        for i in indices:
-
-            if i >= len(job_desc_list):
-                continue
-
-            desc = job_desc_list[i]
-            role = extract_job_role(desc)
-
-            if role in seen:
-                continue
-
-            seen.add(role)
-
-            required = extract_skills(desc)
-            user_skills = clean_input(user_input)
-
-            missing = [s for s in required if s not in user_skills]
-
-            score = int(similarity[0][i] * 100)
-
+        if score > 0:
             results.append({
                 "role": role,
                 "score": score,
-                "required": ", ".join(required) if required else "None",
-                "missing": ", ".join(missing) if missing else "None",
-                "roadmap": generate_roadmap(missing)
+                "required": ", ".join(skills),
+                "missing": ", ".join(missing),
+                "roadmap": generate_roadmap(role, missing)
             })
 
-            if len(results) >= 5:
-                break
+    results = sorted(results, key=lambda x: x["score"], reverse=True)
 
-    except Exception as e:
-        print("ERROR:", e)
-        return []
-
-    save_results(results)
-    return results
-
+    return results[:4]
 # ==============================
 # ROUTES
 # ==============================

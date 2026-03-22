@@ -30,34 +30,43 @@ def init_db():
 init_db()
 
 # =========================
-# LOAD DATASET (FINAL FIX - LIST BASED)
+# LOAD DATASET (SAFE VERSION)
 # =========================
+try:
+    df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
+except:
+    df = pd.DataFrame()
 
-df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
+# Safe cleaning (NO dropna)
+if not df.empty:
+    df = df.fillna("").reset_index(drop=True)
+    df = df.head(2000).reset_index(drop=True)
 
-df = df.dropna().reset_index(drop=True)
-df = df.head(2000).reset_index(drop=True)
+    # Safe column access
+    if df.shape[1] > 4:
+        job_desc_column = df.iloc[:, 4].astype(str)
+    else:
+        job_desc_column = pd.Series([])
+else:
+    job_desc_column = pd.Series([])
 
-# Extract job descriptions
-job_desc_column = df.iloc[:, 4].astype(str)
+# Remove empty text safely
+job_desc_column = job_desc_column[job_desc_column.str.strip() != ""]
 
-# Remove empty rows
-job_desc_column = job_desc_column[job_desc_column.str.strip() != ""].reset_index(drop=True)
-
-# Convert to list (IMPORTANT FIX)
+# Convert to list
 job_desc_list = job_desc_column.tolist()
 
-# Fallback safety
+# Fallback (VERY IMPORTANT)
 if len(job_desc_list) == 0:
     job_desc_list = ["python data science machine learning"]
 
+# Vectorizer
 vectorizer = TfidfVectorizer(stop_words='english')
 tfidf_matrix = vectorizer.fit_transform(job_desc_list)
 
 # =========================
 # SKILLS LIST
 # =========================
-
 SKILLS = [
     "python","java","c++","machine learning","deep learning",
     "data science","nlp","sql","html","css","javascript",
@@ -90,18 +99,20 @@ def extract_job_role(text):
 
 def generate_roadmap(role, missing):
     if missing == ["None"]:
-        return "Build advanced projects → Practice → Apply"
+        return "Build projects → Practice → Apply"
     return f"Learn {', '.join(missing)} → Build projects → Practice → Apply"
 
 # =========================
-# JOB SUGGESTION
+# JOB SUGGESTION (SAFE)
 # =========================
-
 def suggest_jobs(user_input):
     results = []
 
-    user_vec = vectorizer.transform([user_input])
-    similarity = cosine_similarity(user_vec, tfidf_matrix)
+    try:
+        user_vec = vectorizer.transform([user_input])
+        similarity = cosine_similarity(user_vec, tfidf_matrix)
+    except:
+        return []
 
     indices = similarity[0].argsort()[-30:][::-1]
     user_skills = clean_input(user_input)
@@ -125,7 +136,7 @@ def suggest_jobs(user_input):
         matched = len([s for s in required if s in user_skills])
         total = len(required) if required else 1
 
-        score = int(min(95, (matched/total)*100 + 40))
+        score = int(min(95, (matched / total) * 100 + 40))
 
         missing = [s for s in required if s not in user_skills]
 
@@ -145,8 +156,7 @@ def suggest_jobs(user_input):
 # =========================
 # AUTH ROUTES
 # =========================
-
-@app.route('/register', methods=['GET','POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
@@ -166,7 +176,6 @@ def register():
             return "User already exists"
 
     return render_template('register.html')
-
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -188,7 +197,6 @@ def login():
 
     return render_template('login.html')
 
-
 @app.route('/logout')
 def logout():
     session.pop('user', None)
@@ -197,7 +205,6 @@ def logout():
 # =========================
 # MAIN PAGE
 # =========================
-
 @app.route('/', methods=['GET','POST'])
 def home():
 
@@ -207,8 +214,8 @@ def home():
     results = None
 
     if request.method == 'POST':
-        skills = request.form['skills']
-        interests = request.form['interests']
+        skills = request.form.get('skills', '')
+        interests = request.form.get('interests', '')
 
         user_input = skills + " " + interests
         results = suggest_jobs(user_input)
@@ -218,7 +225,6 @@ def home():
 # =========================
 # RUN
 # =========================
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

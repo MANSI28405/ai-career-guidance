@@ -34,15 +34,27 @@ init_db()
 # =========================
 
 df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
+
+# Clean data
 df = df.dropna()
 df = df.head(2000)
 
-vectorizer = TfidfVectorizer(stop_words='english')
-
-# 👉 use column index instead of name
+# Use column index (safe)
 job_desc_column = df.iloc[:, 4].astype(str)
 
+# Remove empty rows
+job_desc_column = job_desc_column[job_desc_column.str.strip() != ""]
+
+# Fallback if empty (VERY IMPORTANT)
+if job_desc_column.empty:
+    job_desc_column = pd.Series(["python data science machine learning"])
+
+vectorizer = TfidfVectorizer(stop_words='english')
 tfidf_matrix = vectorizer.fit_transform(job_desc_column)
+
+# =========================
+# SKILLS LIST
+# =========================
 
 SKILLS = [
     "python","java","c++","machine learning","deep learning",
@@ -79,6 +91,10 @@ def generate_roadmap(role, missing):
         return "Build advanced projects → Practice → Apply"
     return f"Learn {', '.join(missing)} → Build projects → Practice → Apply"
 
+# =========================
+# JOB SUGGESTION
+# =========================
+
 def suggest_jobs(user_input):
     results = []
 
@@ -91,8 +107,7 @@ def suggest_jobs(user_input):
     seen = set()
 
     for i in indices:
-        # 👉 FIX: use same column index
-        desc = str(df.iloc[i, 4])
+        desc = str(df.iloc[i, 4])  # FIXED
 
         role = extract_job_role(desc)
 

@@ -35,17 +35,17 @@ init_db()
 
 df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
 
-# Clean data
-df = df.dropna()
-df = df.head(2000)
+# Clean + reset index (IMPORTANT FIX)
+df = df.dropna().reset_index(drop=True)
+df = df.head(2000).reset_index(drop=True)
 
-# Use column index (safe)
+# Extract job descriptions safely
 job_desc_column = df.iloc[:, 4].astype(str)
 
 # Remove empty rows
 job_desc_column = job_desc_column[job_desc_column.str.strip() != ""]
 
-# Fallback if empty (VERY IMPORTANT)
+# Fallback if empty
 if job_desc_column.empty:
     job_desc_column = pd.Series(["python data science machine learning"])
 
@@ -107,7 +107,10 @@ def suggest_jobs(user_input):
     seen = set()
 
     for i in indices:
-        desc = str(df.iloc[i, 4])  # FIXED
+        try:
+            desc = str(df.iloc[i, 4])  # SAFE ACCESS
+        except:
+            continue
 
         role = extract_job_role(desc)
 

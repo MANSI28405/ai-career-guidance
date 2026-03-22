@@ -48,27 +48,34 @@ jobs_data = [
 # HELPER FUNCTION
 # =========================
 def suggest_jobs(user_input):
-    user_words = user_input.lower().split()
-    results = []
+    if not user_input.strip():
+        return []
 
-    for job in jobs_data:
-        required = job["skills"]
+    jobs = [
+        {
+            "role": "Software Engineer",
+            "required": "python, sql",
+            "missing": "machine learning",
+            "roadmap": "Learn ML → Build projects → Apply",
+            "match": 80
+        },
+        {
+            "role": "Data Scientist",
+            "required": "python, pandas",
+            "missing": "deep learning",
+            "roadmap": "Learn DL → Practice → Apply",
+            "match": 70
+        },
+        {
+            "role": "Backend Developer",
+            "required": "django, sql",
+            "missing": "flask",
+            "roadmap": "Learn Flask → Build APIs → Apply",
+            "match": 60
+        }
+    ]
 
-        matched = [skill for skill in required if skill in user_words]
-        missing = [skill for skill in required if skill not in user_words]
-
-        match_percent = int((len(matched) / len(required)) * 100)
-
-        roadmap = "Learn " + ", ".join(missing) + " → Build projects → Apply"
-
-        results.append({
-            "role": job["role"],
-            "match": match_percent,
-            "required": ", ".join(required),
-            "missing": ", ".join(missing) if missing else "None",
-            "roadmap": roadmap
-        })
-
+    return jobs
     # Sort by match %
     results.sort(key=lambda x: x["match"], reverse=True)
 
@@ -143,7 +150,7 @@ def dashboard():
     if "user" not in session:
         return redirect("/login")
 
-    results = session.get("report", [])
+    results = []
 
     if request.method == "POST":
         skills = request.form.get("skills", "")
@@ -151,9 +158,14 @@ def dashboard():
 
         user_input = skills + " " + interests
 
-        if user_input.strip() != "":
-            results = suggest_jobs(user_input)
-            session["report"] = results
+        # DEBUG PRINT (VERY IMPORTANT)
+        print("USER INPUT:", user_input)
+
+        results = suggest_jobs(user_input)
+
+        print("RESULTS:", results)
+
+        session["report"] = results
 
     return render_template("dashboard.html", results=results)
 # =========================

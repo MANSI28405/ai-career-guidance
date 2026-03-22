@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request, redirect, session
 import sqlite3
 import pandas as pd
@@ -31,30 +30,29 @@ def init_db():
 init_db()
 
 # =========================
-# LOAD DATASET (FINAL FIX)
+# LOAD DATASET (FINAL FIX - LIST BASED)
 # =========================
 
 df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
 
-# Clean dataset
 df = df.dropna().reset_index(drop=True)
 df = df.head(2000).reset_index(drop=True)
 
 # Extract job descriptions
 job_desc_column = df.iloc[:, 4].astype(str)
 
-# Remove empty rows AND sync df
-mask = job_desc_column.str.strip() != ""
-df = df[mask].reset_index(drop=True)
-job_desc_column = job_desc_column[mask].reset_index(drop=True)
+# Remove empty rows
+job_desc_column = job_desc_column[job_desc_column.str.strip() != ""].reset_index(drop=True)
 
-# Fallback if empty
-if job_desc_column.empty:
-    job_desc_column = pd.Series(["python data science machine learning"])
-    df = pd.DataFrame({4: job_desc_column})
+# Convert to list (IMPORTANT FIX)
+job_desc_list = job_desc_column.tolist()
+
+# Fallback safety
+if len(job_desc_list) == 0:
+    job_desc_list = ["python data science machine learning"]
 
 vectorizer = TfidfVectorizer(stop_words='english')
-tfidf_matrix = vectorizer.fit_transform(job_desc_column)
+tfidf_matrix = vectorizer.fit_transform(job_desc_list)
 
 # =========================
 # SKILLS LIST
@@ -111,10 +109,10 @@ def suggest_jobs(user_input):
     seen = set()
 
     for i in indices:
-        if i >= len(df):
+        if i >= len(job_desc_list):
             continue
 
-        desc = str(df.iloc[i, 4])
+        desc = job_desc_list[i]
 
         role = extract_job_role(desc)
 

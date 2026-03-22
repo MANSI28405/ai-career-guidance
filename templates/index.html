@@ -2,158 +2,97 @@
 <html>
 <head>
     <title>AI Career Guidance</title>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
         body {
-            font-family: Arial;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            text-align: center;
-            padding-top: 40px;
-            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin: 0;
+            padding: 0;
         }
 
         .container {
+            width: 420px;
+            margin: 50px auto;
             background: white;
-            color: black;
-            width: 500px;
-            margin: auto;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0px 0px 25px rgba(0,0,0,0.2);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
         }
 
         input {
-            width: 90%;
-            padding: 12px;
+            width: 100%;
+            padding: 10px;
             margin: 10px 0;
-            border-radius: 5px;
+            border-radius: 8px;
             border: 1px solid #ccc;
         }
 
         button {
+            width: 100%;
+            padding: 10px;
             background: #667eea;
             color: white;
-            padding: 12px 25px;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
-            border-radius: 6px;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            background: #5a67d8;
-        }
-
-        .result-box {
-            margin-top: 25px;
-            text-align: left;
         }
 
         .card {
-            background: #f1f5f9;
+            background: #f9f9f9;
             padding: 15px;
-            margin-bottom: 15px;
+            margin-top: 15px;
             border-radius: 10px;
         }
 
-        .bar {
-            height: 10px;
+        .progress {
+            height: 8px;
             background: #ddd;
             border-radius: 5px;
             margin-top: 5px;
         }
 
-        .fill {
-            height: 10px;
+        .progress-bar {
+            height: 8px;
             background: green;
             border-radius: 5px;
-        }
-
-        h2 {
-            color: #2f855a;
         }
     </style>
 </head>
 
 <body>
-
 <div class="container">
 
     <h1>🚀 AI Career Guidance</h1>
 
     <form method="POST">
-       <input type="text" name="skills" 
-       placeholder="Enter skills (comma or space separated)" 
-       value="{{ skills }}">
-
-<input type="text" name="interests" 
-       placeholder="Enter interests" 
-       value="{{ interests }}">
-        <button type="submit">Get Career Suggestions</button>
+        <input type="text" name="skills" placeholder="Enter skills">
+        <input type="text" name="interests" placeholder="Enter interests">
+        <button type="submit">Get Suggestions</button>
     </form>
 
     {% if results %}
-    <div class="result-box">
-
-        <h2>🎯 Career Suggestions</h2>
-
-        <!-- Chart -->
-        <canvas id="careerChart" width="400" height="200"></canvas>
-
-        <br>
+        <h2>🎯 Suggestions</h2>
 
         {% for r in results %}
         <div class="card">
             <h3>{{ r.role }}</h3>
+            <p>Match: {{ r.score }}%</p>
 
-            <p><b>Match:</b> {{ r.match }}%</p>
-
-            <div class="bar">
-                <div class="fill" style="width: {{ r.match }}%;"></div>
+            <div class="progress">
+                <div class="progress-bar" style="width: {{ r.score }}%"></div>
             </div>
 
-            <p><b>Required Skills:</b> {{ r.skills | join(', ') }}</p>
-            <p><b>Missing Skills:</b> {{ r.missing | join(', ') }}</p>
+            <p><b>Required:</b> {{ r.required }}</p>
+            <p><b>Missing:</b> {{ r.missing }}</p>
             <p><b>Roadmap:</b> {{ r.roadmap }}</p>
         </div>
         {% endfor %}
-
-    </div>
-
-    <!-- SAFE JSON (NO ERRORS) -->
-    <script>
-        const data = {{ results | tojson }};
-
-        const roles = data.map(item => item.role);
-        const scores = data.map(item => item.match);
-
-        const ctx = document.getElementById('careerChart').getContext('2d');
-
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: roles,
-                datasets: [{
-                    label: 'Match %',
-                    data: scores
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-    </script>
-
     {% endif %}
 
 </div>
-
 </body>
 </html>

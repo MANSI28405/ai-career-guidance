@@ -1,85 +1,73 @@
-from flask import Flask, render_template, request, redirect, session
-import sqlite3
+from flask import Flask, render_template, request, redirect, session, jsonify
 import pandas as pd
+import os
+import json
 import re
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-# =========================
-# DATABASE SETUP
-# =========================
-def init_db():
-    conn = sqlite3.connect("users.db")
-    c = conn.cursor()
+# ==============================
+# LOAD DATA SAFELY
+# ==============================
 
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
-    )
-    """)
+CSV_FILE = "naukri_com-job_sample.csv"
 
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# =========================
-# LOAD DATASET (SAFE VERSION)
-# =========================
-try:
-    df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
-except:
-    df = pd.DataFrame()
-
-# Safe cleaning (NO dropna)
-if not df.empty:
-    df = df.fillna("").reset_index(drop=True)
-    df = df.head(2000).reset_index(drop=True)
-
-    # Safe column access
-    if df.shape[1] > 4:
-        job_desc_column = df.iloc[:, 4].astype(str)
-    else:
-        job_desc_column = pd.Series([])
+if os.path.exists(CSV_FILE):
+    df = pd.read_csv(CSV_FILE, encoding="latin1")
 else:
-    job_desc_column = pd.Series([])
+    print("CSV not found. Creating dummy dataset.")
+    df = pd.DataFrame({
+        "jobdesc": [
+            "python developer machine learning",
+            "frontend developer html css javascript",
+            "backend developer flask django sql",
+            "data scientist python pandas numpy",
+            "machine learning engineer python tensorflow"
+        ]
+    })
 
-# Remove empty text safely
-job_desc_column = job_desc_column[job_desc_column.str.strip() != ""]
+# Clean dataset
+df = df.dropna()
 
-# Convert to list
-job_desc_list = job_desc_column.tolist()
+# IMPORTANT FIX (prevents 500 error)
+if "jobdesc" not in df.columns:
+    df["jobdesc"] = df.iloc[:, 0]
 
-# Fallback (VERY IMPORTANT)
-if len(job_desc_list) == 0:
-    job_desc_list = ["python data science machine learning"]
+df = df.head(2000)
 
-# Vectorizer
-vectorizer = TfidfVectorizer(stop_words='english')
+job_desc_list = df["jobdesc"].astype(str).tolist()
+
+# ==============================
+# ML MODEL
+# ==============================
+
+vectorizer = TfidfVectorizer(stop_words="english")
 tfidf_matrix = vectorizer.fit_transform(job_desc_list)
 
-# =========================
+# ==============================
 # SKILLS LIST
-# =========================
+# ==============================
+
 SKILLS = [
     "python","java","c++","machine learning","deep learning",
     "data science","nlp","sql","html","css","javascript",
     "react","flask","django","tensorflow","pandas","numpy"
 ]
 
+# ==============================
+# HELPERS
+# ==============================
+
 def clean_input(text):
-    return re.sub(r'[,]+', ' ', text.lower()).split()
+    return re.sub(r'[^\w\s]', '', text.lower()).split()
 
 def extract_skills(text):
     text = str(text).lower()
-    found = [s for s in SKILLS if s in text]
-    return list(set(found)) if found else ["Not specified"]
+    return list(set([s for s in SKILLS if s in text]))
 
 def extract_job_role(text):
     text = str(text).lower()
@@ -92,139 +80,109 @@ def extract_job_role(text):
         return "Backend Developer"
     elif "frontend" in text:
         return "Frontend Developer"
-    elif "python developer" in text:
+    elif "python" in text:
         return "Python Developer"
     else:
         return "Software Engineer"
 
-def generate_roadmap(role, missing):
-    if missing == ["None"]:
+def generate_roadmap(missing):
+    if not missing:
         return "Build projects → Practice → Apply"
     return f"Learn {', '.join(missing)} → Build projects → Practice → Apply"
 
-# =========================
-# JOB SUGGESTION (SAFE)
-# =========================
+def save_results(results):
+    with open("results.json", "w") as f:
+        json.dump(results, f)
+
+# ==============================
+# CORE FUNCTION
+# ==============================
+
 def suggest_jobs(user_input):
+
     results = []
 
     try:
         user_vec = vectorizer.transform([user_input])
         similarity = cosine_similarity(user_vec, tfidf_matrix)
-    except:
+
+        indices = similarity[0].argsort()[-10:][::-1]
+
+        seen_roles = set()
+
+        for i in indices:
+
+            if i >= len(job_desc_list):
+                continue
+
+            desc = job_desc_list[i]
+            role = extract_job_role(desc)
+
+            if role in seen_roles:
+                continue
+
+            seen_roles.add(role)
+
+            required_skills = extract_skills(desc)
+            user_skills = clean_input(user_input)
+
+            missing = [s for s in required_skills if s not in user_skills]
+
+            score = int(similarity[0][i] * 100)
+
+            results.append({
+                "role": role,
+                "score": score,
+                "required": ", ".join(required_skills) if required_skills else "None",
+                "missing": ", ".join(missing) if missing else "None",
+                "roadmap": generate_roadmap(missing)
+            })
+
+            if len(results) >= 5:
+                break
+
+    except Exception as e:
+        print("ERROR:", e)
         return []
 
-    indices = similarity[0].argsort()[-30:][::-1]
-    user_skills = clean_input(user_input)
-
-    seen = set()
-
-    for i in indices:
-        if i >= len(job_desc_list):
-            continue
-
-        desc = job_desc_list[i]
-
-        role = extract_job_role(desc)
-
-        if role in seen:
-            continue
-        seen.add(role)
-
-        required = extract_skills(desc)
-
-        matched = len([s for s in required if s in user_skills])
-        total = len(required) if required else 1
-
-        score = int(min(95, (matched / total) * 100 + 40))
-
-        missing = [s for s in required if s not in user_skills]
-
-        results.append({
-            "role": role,
-            "match": score,
-            "skills": required,
-            "missing": missing if missing else ["None"],
-            "roadmap": generate_roadmap(role, missing if missing else ["None"])
-        })
-
-        if len(results) == 5:
-            break
-
+    save_results(results)
     return results
 
-# =========================
-# AUTH ROUTES
-# =========================
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+# ==============================
+# ROUTES
+# ==============================
 
-        if len(password) < 5:
-            return "Password must be at least 5 characters"
-
-        try:
-            conn = sqlite3.connect("users.db")
-            c = conn.cursor()
-            c.execute("INSERT INTO users (username,password) VALUES (?,?)",(username,password))
-            conn.commit()
-            conn.close()
-            return redirect('/login')
-        except:
-            return "User already exists"
-
-    return render_template('register.html')
-
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        conn = sqlite3.connect("users.db")
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE username=? AND password=?",(username,password))
-        user = c.fetchone()
-        conn.close()
-
-        if user:
-            session['user'] = username
-            return redirect('/')
-        else:
-            return "Invalid credentials"
-
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect('/login')
-
-# =========================
-# MAIN PAGE
-# =========================
-@app.route('/', methods=['GET','POST'])
+@app.route("/", methods=["GET", "POST"])
 def home():
 
     if 'user' not in session:
-        return redirect('/login')
+        session['user'] = "guest"
 
     results = None
 
-    if request.method == 'POST':
-        skills = request.form.get('skills', '')
-        interests = request.form.get('interests', '')
+    if request.method == "POST":
+        skills = request.form.get("skills", "")
+        interests = request.form.get("interests", "")
 
         user_input = skills + " " + interests
+
         results = suggest_jobs(user_input)
 
-    return render_template('index.html', results=results)
+    return render_template("index.html", results=results)
 
-# =========================
+
+@app.route("/download")
+def download():
+    if os.path.exists("results.json"):
+        with open("results.json") as f:
+            return jsonify(json.load(f))
+    return jsonify({"error": "No results yet"})
+
+
+# ==============================
 # RUN
-# =========================
+# ==============================
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

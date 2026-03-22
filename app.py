@@ -1,177 +1,115 @@
 from flask import Flask, render_template, request, redirect, session, send_file
-import pandas as pd
-import os
-import io
-import re
 import sqlite3
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import io
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
 # =========================
-# DATABASE SETUP
+# DUMMY JOB DATA (SIMPLE)
 # =========================
-def init_db():
-    conn = sqlite3.connect("users.db")
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT,
-        password TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# =========================
-# LOAD DATASET (SAFE)
-# =========================
-DATA_FILE = "naukri_com-job_sample.csv"
-
-try:
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE, encoding="latin1")
-        df = df.dropna()
-        df = df.head(1200)
-
-        if "jobdescription" in df.columns:
-            job_desc_list = df["jobdescription"].astype(str).tolist()
-        else:
-            job_desc_list = ["python developer", "data science"]
-    else:
-        job_desc_list = ["python developer", "machine learning"]
-
-except:
-    job_desc_list = ["python developer", "backend developer"]
-
-# =========================
-# LAZY MODEL LOADING (FIX 502)
-# =========================
-vectorizer = None
-tfidf_matrix = None
-
-def load_model():
-    global vectorizer, tfidf_matrix
-    if vectorizer is None:
-        vectorizer = TfidfVectorizer(stop_words="english")
-        tfidf_matrix = vectorizer.fit_transform(job_desc_list)
-
-# =========================
-# SKILLS
-# =========================
-SKILLS = [
-    "python","java","c++","machine learning","deep learning",
-    "data science","nlp","sql","html","css","javascript",
-    "react","flask","django","tensorflow","pandas","numpy"
+jobs_data = [
+    {
+        "role": "Software Engineer",
+        "skills": ["python", "sql"]
+    },
+    {
+        "role": "Machine Learning Engineer",
+        "skills": ["python", "ml", "deep learning"]
+    },
+    {
+        "role": "Backend Developer",
+        "skills": ["python", "django", "flask", "sql"]
+    },
+    {
+        "role": "Data Scientist",
+        "skills": ["python", "pandas", "machine learning"]
+    }
 ]
 
-def extract_skills(text):
-    text = str(text).lower()
-    return [s for s in SKILLS if s in text]
-
-def extract_role(text):
-    text = text.lower()
-    if "data scientist" in text:
-        return "Data Scientist"
-    elif "machine learning" in text:
-        return "ML Engineer"
-    elif "backend" in text:
-        return "Backend Developer"
-    elif "frontend" in text:
-        return "Frontend Developer"
-    elif "python" in text:
-        return "Python Developer"
-    else:
-        return "Software Engineer"
-
-def roadmap(missing):
-    if not missing:
-        return "Build → Practice → Apply"
-    return f"Learn {', '.join(missing)} → Build → Practice → Apply"
-
 # =========================
-# AI LOGIC
+# HELPER FUNCTION
 # =========================
 def suggest_jobs(user_input):
-    load_model()
-
+    user_words = user_input.lower().split()
     results = []
-    user_vec = vectorizer.transform([user_input])
-    sim = cosine_similarity(user_vec, tfidf_matrix)
 
-    indices = sim[0].argsort()[-10:][::-1]
-    user_skills = extract_skills(user_input)
+    for job in jobs_data:
+        required = job["skills"]
 
-    seen = set()
+        matched = [skill for skill in required if skill in user_words]
+        missing = [skill for skill in required if skill not in user_words]
 
-    for i in indices:
-        desc = job_desc_list[i]
-        role = extract_role(desc)
+        match_percent = int((len(matched) / len(required)) * 100)
 
-        if role in seen:
-            continue
-        seen.add(role)
-
-        job_skills = extract_skills(desc)
-
-        match = len(set(user_skills) & set(job_skills))
-        total = len(job_skills) if job_skills else 1
-        percent = int((match / total) * 100)
-
-        missing = list(set(job_skills) - set(user_skills))
+        roadmap = "Learn " + ", ".join(missing) + " → Build projects → Apply"
 
         results.append({
-            "role": role,
-            "match": percent,
-            "required": ", ".join(job_skills) or "basic",
-            "missing": ", ".join(missing) or "None",
-            "roadmap": roadmap(missing)
+            "role": job["role"],
+            "match": match_percent,
+            "required": ", ".join(required),
+            "missing": ", ".join(missing) if missing else "None",
+            "roadmap": roadmap
         })
 
-    return results[:5]
+    # Sort by match %
+    results.sort(key=lambda x: x["match"], reverse=True)
+
+    return results
+
 
 # =========================
-# ROUTES
+# HOME → LOGIN
 # =========================
-
 @app.route("/")
 def home():
     return redirect("/login")
 
+
+# =========================
 # LOGIN
+# =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        user = request.form["username"]
-        pwd = request.form["password"]
+        username = request.form.get("username")
+        password = request.form.get("password")
 
         conn = sqlite3.connect("users.db")
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE username=? AND password=?", (user, pwd))
-        data = c.fetchone()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password),
+        )
+        user = cursor.fetchone()
         conn.close()
 
-        if data:
-            session["user"] = user
+        if user:
+            session["user"] = username
             return redirect("/dashboard")
+        else:
+            return "Invalid Credentials"
 
     return render_template("login.html")
 
+
+# =========================
 # REGISTER
+# =========================
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        user = request.form["username"]
-        pwd = request.form["password"]
+        username = request.form["username"]
+        password = request.form["password"]
 
         conn = sqlite3.connect("users.db")
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (user, pwd))
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            (username, password),
+        )
         conn.commit()
         conn.close()
 
@@ -179,25 +117,35 @@ def register():
 
     return render_template("register.html")
 
+
+# =========================
 # DASHBOARD
+# =========================
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if "user" not in session:
         return redirect("/login")
 
-    results = []
+    # keep previous results
+    results = session.get("report", [])
 
     if request.method == "POST":
         skills = request.form.get("skills", "")
         interests = request.form.get("interests", "")
+
         user_input = skills + " " + interests
 
         results = suggest_jobs(user_input)
+
+        # save for download
         session["report"] = results
 
     return render_template("dashboard.html", results=results)
 
+
+# =========================
 # DOWNLOAD REPORT
+# =========================
 @app.route("/download")
 def download():
     data = session.get("report", [])
@@ -217,19 +165,27 @@ def download():
     buffer.write(content.encode())
     buffer.seek(0)
 
-    return send_file(buffer, as_attachment=True,
-                     download_name="report.txt",
-                     mimetype="text/plain")
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="report.txt",
+        mimetype="text/plain"
+    )
 
+
+# =========================
 # LOGOUT
+# =========================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
+
 # =========================
 # RUN
 # =========================
 if __name__ == "__main__":
+    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

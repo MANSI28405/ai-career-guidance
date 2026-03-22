@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, session, jsonify
 import pandas as pd
 import os
 import json
@@ -11,45 +11,50 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 
 # ==============================
-# LOAD DATA SAFELY
+# LOAD DATA SAFELY (NO CRASH)
 # ==============================
 
 CSV_FILE = "naukri_com-job_sample.csv"
+job_desc_list = []
 
-if os.path.exists(CSV_FILE):
-    df = pd.read_csv(CSV_FILE, encoding="latin1")
-else:
-    print("CSV not found. Creating dummy dataset.")
-    df = pd.DataFrame({
-        "jobdesc": [
-            "python developer machine learning",
-            "frontend developer html css javascript",
-            "backend developer flask django sql",
-            "data scientist python pandas numpy",
-            "machine learning engineer python tensorflow"
-        ]
-    })
+try:
+    if os.path.exists(CSV_FILE):
+        df = pd.read_csv(CSV_FILE, encoding="latin1")
+        df = df.dropna()
 
-# Clean dataset
-df = df.dropna()
+        if "jobdesc" not in df.columns:
+            df["jobdesc"] = df.iloc[:, 0]
 
-# IMPORTANT FIX (prevents 500 error)
-if "jobdesc" not in df.columns:
-    df["jobdesc"] = df.iloc[:, 0]
+        df = df.head(1000)
+        job_desc_list = df["jobdesc"].astype(str).tolist()
 
-df = df.head(2000)
+    else:
+        raise Exception("CSV not found")
 
-job_desc_list = df["jobdesc"].astype(str).tolist()
+except Exception as e:
+    print("⚠️ Using fallback dataset:", e)
+
+    job_desc_list = [
+        "python developer machine learning pandas numpy",
+        "frontend developer html css javascript react",
+        "backend developer flask django sql api",
+        "data scientist python pandas numpy machine learning",
+        "machine learning engineer tensorflow deep learning python"
+    ]
 
 # ==============================
-# ML MODEL
+# ML MODEL (SAFE)
 # ==============================
 
 vectorizer = TfidfVectorizer(stop_words="english")
-tfidf_matrix = vectorizer.fit_transform(job_desc_list)
+
+if job_desc_list:
+    tfidf_matrix = vectorizer.fit_transform(job_desc_list)
+else:
+    tfidf_matrix = None
 
 # ==============================
-# SKILLS LIST
+# SKILLS
 # ==============================
 
 SKILLS = [
@@ -95,10 +100,20 @@ def save_results(results):
         json.dump(results, f)
 
 # ==============================
-# CORE FUNCTION
+# CORE FUNCTION (SAFE)
 # ==============================
 
 def suggest_jobs(user_input):
+
+    # 🔥 fallback safety (prevents crash)
+    if not job_desc_list or tfidf_matrix is None:
+        return [{
+            "role": "Software Engineer",
+            "score": 80,
+            "required": "python, sql",
+            "missing": "machine learning",
+            "roadmap": "Learn ML → Build projects → Apply"
+        }]
 
     results = []
 
@@ -108,7 +123,7 @@ def suggest_jobs(user_input):
 
         indices = similarity[0].argsort()[-10:][::-1]
 
-        seen_roles = set()
+        seen = set()
 
         for i in indices:
 
@@ -118,22 +133,22 @@ def suggest_jobs(user_input):
             desc = job_desc_list[i]
             role = extract_job_role(desc)
 
-            if role in seen_roles:
+            if role in seen:
                 continue
 
-            seen_roles.add(role)
+            seen.add(role)
 
-            required_skills = extract_skills(desc)
+            required = extract_skills(desc)
             user_skills = clean_input(user_input)
 
-            missing = [s for s in required_skills if s not in user_skills]
+            missing = [s for s in required if s not in user_skills]
 
             score = int(similarity[0][i] * 100)
 
             results.append({
                 "role": role,
                 "score": score,
-                "required": ", ".join(required_skills) if required_skills else "None",
+                "required": ", ".join(required) if required else "None",
                 "missing": ", ".join(missing) if missing else "None",
                 "roadmap": generate_roadmap(missing)
             })
@@ -177,7 +192,6 @@ def download():
         with open("results.json") as f:
             return jsonify(json.load(f))
     return jsonify({"error": "No results yet"})
-
 
 # ==============================
 # RUN

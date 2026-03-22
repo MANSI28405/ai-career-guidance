@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, render_template, request, redirect, session
 import sqlite3
 import pandas as pd
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -31,13 +32,17 @@ init_db()
 # =========================
 # LOAD DATASET
 # =========================
-df = pd.read_csv("naukri_com-job_sample.csv")
-print(df.columns)
-df = df.dropna(subset=["jobdescr"])
+
+df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
+df = df.dropna()
 df = df.head(2000)
 
 vectorizer = TfidfVectorizer(stop_words='english')
-tfidf_matrix = vectorizer.fit_transform(df["jobdescr"])
+
+# 👉 use column index instead of name
+job_desc_column = df.iloc[:, 4].astype(str)
+
+tfidf_matrix = vectorizer.fit_transform(job_desc_column)
 
 SKILLS = [
     "python","java","c++","machine learning","deep learning",
@@ -86,7 +91,9 @@ def suggest_jobs(user_input):
     seen = set()
 
     for i in indices:
-        desc = df.iloc[i]["jobdescr"]
+        # 👉 FIX: use same column index
+        desc = str(df.iloc[i, 4])
+
         role = extract_job_role(desc)
 
         if role in seen:
@@ -170,6 +177,7 @@ def logout():
 # =========================
 # MAIN PAGE
 # =========================
+
 @app.route('/', methods=['GET','POST'])
 def home():
 
@@ -190,7 +198,6 @@ def home():
 # =========================
 # RUN
 # =========================
-import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

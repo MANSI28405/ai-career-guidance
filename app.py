@@ -143,7 +143,6 @@ def dashboard():
     if "user" not in session:
         return redirect("/login")
 
-    # keep previous results
     results = session.get("report", [])
 
     if request.method == "POST":
@@ -152,14 +151,11 @@ def dashboard():
 
         user_input = skills + " " + interests
 
-        results = suggest_jobs(user_input)
-
-        # save for download
-        session["report"] = results
+        if user_input.strip() != "":
+            results = suggest_jobs(user_input)
+            session["report"] = results
 
     return render_template("dashboard.html", results=results)
-
-
 # =========================
 # DOWNLOAD REPORT
 # =========================

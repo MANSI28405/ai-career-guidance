@@ -2,57 +2,26 @@
 <html>
 <head>
     <title>Dashboard</title>
-    <style>
-        body {
-            font-family: Arial;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            padding: 20px;
-            color: white;
-        }
-
-        .card {
-            background: white;
-            color: black;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-
-        .bar {
-            height: 8px;
-            background: #ddd;
-            border-radius: 5px;
-        }
-
-        .fill {
-            height: 8px;
-            background: green;
-            border-radius: 5px;
-        }
-
-        button {
-            padding: 10px;
-            background: green;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
-    </style>
 </head>
 
-<body>
+<body style="background: linear-gradient(to right, #667eea, #764ba2); font-family: Arial; padding: 20px; color:white;">
+
+<h2>AI Career Guidance</h2>
+
+<form method="POST">
+    <input name="skills" placeholder="Enter skills" style="padding:10px; width:200px;">
+    <input name="interests" placeholder="Enter interests" style="padding:10px; width:200px;">
+    <button type="submit">Get Suggestions</button>
+</form>
+
+<br><br>
 
 <h2>Career Suggestions</h2>
 
 {% for job in results %}
-<div class="card">
+<div style="background:white; color:black; padding:10px; margin-bottom:10px;">
     <h3>{{ job.role }}</h3>
     <p>Match: {{ job.match }}%</p>
-
-    <div class="bar">
-        <div class="fill" style="width: {{ job.match }}%"></div>
-    </div>
-
     <p><b>Required:</b> {{ job.required }}</p>
     <p><b>Missing:</b> {{ job.missing }}</p>
     <p><b>Roadmap:</b> {{ job.roadmap }}</p>
@@ -60,14 +29,9 @@
 {% endfor %}
 
 <br>
-<a href="/download">
-    <button>Download Report</button>
-</a>
 
-<br><br>
-<a href="/logout">
-    <button>Logout</button>
-</a>
+<a href="/download"><button>Download Report</button></a>
+<a href="/logout"><button>Logout</button></a>
 
 </body>
 </html>

@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, session
 import sqlite3
 import pandas as pd
@@ -30,24 +31,27 @@ def init_db():
 init_db()
 
 # =========================
-# LOAD DATASET
+# LOAD DATASET (FINAL FIX)
 # =========================
 
 df = pd.read_csv("naukri_com-job_sample.csv", encoding="latin1")
 
-# Clean + reset index (IMPORTANT FIX)
+# Clean dataset
 df = df.dropna().reset_index(drop=True)
 df = df.head(2000).reset_index(drop=True)
 
-# Extract job descriptions safely
+# Extract job descriptions
 job_desc_column = df.iloc[:, 4].astype(str)
 
-# Remove empty rows
-job_desc_column = job_desc_column[job_desc_column.str.strip() != ""]
+# Remove empty rows AND sync df
+mask = job_desc_column.str.strip() != ""
+df = df[mask].reset_index(drop=True)
+job_desc_column = job_desc_column[mask].reset_index(drop=True)
 
 # Fallback if empty
 if job_desc_column.empty:
     job_desc_column = pd.Series(["python data science machine learning"])
+    df = pd.DataFrame({4: job_desc_column})
 
 vectorizer = TfidfVectorizer(stop_words='english')
 tfidf_matrix = vectorizer.fit_transform(job_desc_column)
@@ -107,10 +111,10 @@ def suggest_jobs(user_input):
     seen = set()
 
     for i in indices:
-        try:
-            desc = str(df.iloc[i, 4])  # SAFE ACCESS
-        except:
+        if i >= len(df):
             continue
+
+        desc = str(df.iloc[i, 4])
 
         role = extract_job_role(desc)
 

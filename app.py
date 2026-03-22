@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, send_file
+from flask import Flask, render_template, request, session, send_file
 import pandas as pd
 import os
 import io
@@ -14,20 +14,40 @@ app.secret_key = "secret123"
 # =========================
 DATA_FILE = "naukri_com-job_sample.csv"
 
-if os.path.exists(DATA_FILE):
-    df = pd.read_csv(DATA_FILE, encoding="latin1")
-    df = df.dropna()
-    df = df.head(2000)
-    job_desc_list = df["jobdescription"].astype(str).tolist()
-else:
-    print("⚠️ CSV FILE NOT FOUND")
-    job_desc_list = ["python developer job", "machine learning engineer job"]
+try:
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE, encoding="latin1")
+        df = df.dropna()
+        df = df.head(1500)  # reduced for performance
+
+        if "jobdescription" in df.columns:
+            job_desc_list = df["jobdescription"].astype(str).tolist()
+        else:
+            job_desc_list = ["python developer job", "data science job"]
+    else:
+        print("CSV not found → fallback used")
+        job_desc_list = ["python developer job", "machine learning job"]
+
+except Exception as e:
+    print("DATA LOAD ERROR:", e)
+    job_desc_list = ["python developer job", "backend developer job"]
 
 # =========================
-# TF-IDF MODEL
+# LAZY LOAD MODEL (IMPORTANT)
 # =========================
-vectorizer = TfidfVectorizer(stop_words="english")
-tfidf_matrix = vectorizer.fit_transform(job_desc_list)
+vectorizer = None
+tfidf_matrix = None
+
+def load_model():
+    global vectorizer, tfidf_matrix
+
+    if vectorizer is None:
+        print("Loading ML model...")
+
+        vectorizer = TfidfVectorizer(stop_words="english")
+        tfidf_matrix = vectorizer.fit_transform(job_desc_list)
+
+        print("Model loaded")
 
 # =========================
 # SKILLS LIST
@@ -49,8 +69,7 @@ def clean_input(text):
 # =========================
 def extract_skills(text):
     text = str(text).lower()
-    found = [s for s in SKILLS if s in text]
-    return list(set(found)) if found else []
+    return [s for s in SKILLS if s in text]
 
 # =========================
 # DETECT ROLE
@@ -72,7 +91,7 @@ def extract_job_role(text):
         return "Software Engineer"
 
 # =========================
-# ROADMAP GENERATOR
+# ROADMAP
 # =========================
 def generate_roadmap(missing):
     if not missing:
@@ -80,9 +99,11 @@ def generate_roadmap(missing):
     return f"Learn {', '.join(missing)} → Build projects → Practice → Apply"
 
 # =========================
-# MAIN LOGIC
+# CORE LOGIC
 # =========================
 def suggest_jobs(user_input):
+    load_model()  # 🔥 important fix
+
     results = []
 
     try:
@@ -130,7 +151,6 @@ def suggest_jobs(user_input):
 # =========================
 # ROUTES
 # =========================
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     results = []
@@ -148,7 +168,7 @@ def index():
     return render_template("index.html", results=results)
 
 # =========================
-# DOWNLOAD REPORT (FIXED)
+# DOWNLOAD REPORT (WORKING)
 # =========================
 @app.route("/download")
 def download_report():
@@ -156,15 +176,15 @@ def download_report():
         results = session.get("report", [])
 
         if not results:
-            return "No data available to download"
+            return "No data available"
 
         content = "AI Career Guidance Report\n\n"
 
         for job in results:
             content += f"Role: {job['role']}\n"
             content += f"Match: {job['match']}%\n"
-            content += f"Required Skills: {job['required']}\n"
-            content += f"Missing Skills: {job['missing']}\n"
+            content += f"Required: {job['required']}\n"
+            content += f"Missing: {job['missing']}\n"
             content += f"Roadmap: {job['roadmap']}\n"
             content += "-"*40 + "\n"
 

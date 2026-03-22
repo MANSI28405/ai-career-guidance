@@ -1,29 +1,21 @@
-<!DOCTYPE html>
 <html>
-<head>
-    <title>Dashboard</title>
-</head>
-
-<body style="background: linear-gradient(to right, #667eea, #764ba2); font-family: Arial; padding:20px; color:white;">
+<body style="background:linear-gradient(to right,#667eea,#764ba2); padding:20px; color:white;">
 
 <h2>AI Career Guidance</h2>
 
-<!-- INPUT FORM -->
-<div style="background:white; padding:15px; color:black; width:300px;">
-<form method="POST">
+<form method="POST" style="background:white; color:black; padding:15px; width:300px;">
     <input name="skills" placeholder="Enter skills"><br><br>
     <input name="interests" placeholder="Enter interests"><br><br>
     <button type="submit">Get Suggestions</button>
 </form>
-</div>
 
 <br>
 
-<h2>Career Suggestions</h2>
+<h3>Career Suggestions</h3>
 
 {% for job in results %}
-<div style="background:white; color:black; padding:10px; margin-top:10px;">
-    <h3>{{ job.role }}</h3>
+<div style="background:white; color:black; padding:10px; margin-bottom:10px;">
+    <h4>{{ job.role }}</h4>
     <p>Match: {{ job.match }}%</p>
     <p><b>Required:</b> {{ job.required }}</p>
     <p><b>Missing:</b> {{ job.missing }}</p>
